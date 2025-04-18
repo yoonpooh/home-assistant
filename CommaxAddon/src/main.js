@@ -54,7 +54,7 @@ const ew11Client = new Ew11Client(HOST, PORT, (bytes) => {
         commandHandler.handleAckOrState(bytes);
     }
     if (bytes[0] === 0x2A || bytes[0] === 0x80) {
-        analyzeParkingAreaAndCarNumber(bytes, mqttClient, state.parkingState, () => saveState(state));
+        analyzeParkingAreaAndCarNumber(bytes, state.parkingState, mqttClient,() => saveState(state));
     }
 
     if (bytes[0] === 0x82 || bytes[0] === 0x84) {

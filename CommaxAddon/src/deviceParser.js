@@ -212,7 +212,7 @@ function analyzeAndDiscoverLight(bytes, discoveredLights, mqttClient, saveState)
     }
 }
 
-function analyzeParkingAreaAndCarNumber(bytes, mqttClient, parkingState, saveState) {
+function analyzeParkingAreaAndCarNumber(bytes, parkingState,mqttClient, saveState) {
     let parkingArea, carNumber;
 
     if (bytes[0] === 0x2A && bytes.length >= 10) {

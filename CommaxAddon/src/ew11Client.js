@@ -1,4 +1,3 @@
-// ew11Client.js
 const net = require('net');
 const {getTimestamp} = require('./deviceParser');
 
@@ -8,7 +7,6 @@ class Ew11Client {
         this.port = port;
         this.onDataCallback = onDataCallback;
         this.safeWriteCallback = safeWriteCallback;
-         // CMD , ACK , REQ , STAT
         this.knownHeaders = [
             0x78, 0xF8, 0x76, 0xF6,// FAN
             0x31, 0xB1, 0x30, 0xB0,// LIGHT
@@ -24,40 +22,106 @@ class Ew11Client {
             0xF7, 0x77, // ?
             0x0F, 0x8F, // ?
         ];
+        this.reconnectDelay = 5000; // 5 seconds
+        this.maxRetryAttempts = 10;
+        this.retryCount = 0;
+        this.connectionTimeout = 10000; // 10 seconds
+        this.isConnecting = false;
+        this.lastDataTime = Date.now();
+        this.dataTimeout = 5000; // 5 seconds with no data
+        this.heartbeatInterval = null;
         this.connect();
     }
 
     connect() {
+        if (this.isConnecting) return;
+        this.isConnecting = true;
+
+        const timeout = setTimeout(() => {
+            console.error('EW11 connection timeout');
+            this.socket.destroy();
+        }, this.connectionTimeout);
+
         this.socket = net.connect(this.port, this.host, () => {
+            clearTimeout(timeout);
+            this.isConnecting = false;
+            this.retryCount = 0;
+            this.lastDataTime = Date.now();
+            this.startHeartbeat();
             console.log('EW11에 연결되었습니다.');
         });
 
         this.socket.on('data', (data) => {
+            this.lastDataTime = Date.now(); // Update last data time
             const bytes = data.toString('hex').match(/.{1,2}/g).map(byte => parseInt(byte, 16));
-            // 알려지지 않은 패킷 로그에 남김
             if (bytes.length > 0 && !this.knownHeaders.includes(bytes[0])) {
                 console.log(`${getTimestamp()} <- ${data.toString('hex').match(/.{1,2}/g).join(' ').toUpperCase()}`);
             }
-
             this.onDataCallback(bytes);
         });
 
         this.socket.on('error', (err) => {
             console.error('EW11 connection error:', err);
+            this.stopHeartbeat();
             this.socket.destroy();
+            this.handleReconnect();
         });
 
         this.socket.on('close', () => {
             console.log('EW11 connection closed');
+            this.stopHeartbeat();
+            this.isConnecting = false;
+            this.handleReconnect();
         });
     }
 
+    startHeartbeat() {
+        if (this.heartbeatInterval) return;
+        this.heartbeatInterval = setInterval(() => {
+            const now = Date.now();
+            if (now - this.lastDataTime > this.dataTimeout) {
+                console.log('No data received for 5 seconds, triggering reconnect');
+                this.socket.destroy();
+            }
+        }, 1000); // Check every second
+    }
+
+    stopHeartbeat() {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
+    }
+
+    handleReconnect() {
+        if (this.retryCount >= this.maxRetryAttempts) {
+            console.error('Max retry attempts reached. Stopping reconnection.');
+            return;
+        }
+
+        this.retryCount++;
+        console.log(`Attempting to reconnect (${this.retryCount}/${this.maxRetryAttempts}) in ${this.reconnectDelay}ms...`);
+
+        setTimeout(() => {
+            if (!this.isConnecting) {
+                this.connect();
+            }
+        }, this.reconnectDelay);
+    }
+
     write(command) {
-        this.safeWriteCallback(command);
+        if (this.socket && !this.socket.destroyed) {
+            this.safeWriteCallback(command);
+        } else {
+            console.warn('Socket is not connected. Command not sent.');
+        }
     }
 
     destroy() {
+        this.stopHeartbeat();
         this.socket.destroy();
+        this.isConnecting = false;
+        this.retryCount = this.maxRetryAttempts; // Prevent reconnection
     }
 }
 
