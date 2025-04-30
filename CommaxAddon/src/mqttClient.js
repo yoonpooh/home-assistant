@@ -1,4 +1,5 @@
 const mqtt = require('mqtt');
+const { log, logError } = require('./utils');
 
 class MqttClient {
     constructor(brokerUrl, options, onMessageCallback) {
@@ -10,9 +11,9 @@ class MqttClient {
 
     setupListeners() {
         this.client.on('connect', async () => {
-            console.log('MQTT 연결되었습니다.');
+            log('MQTT 연결되었습니다.');
             this.client.subscribe(`${this.topicPrefix}/#`, (err) => {
-                if (!err) console.log(`MQTT 토픽 구독 : ${this.topicPrefix}/#`);
+                if (!err) log(`MQTT 토픽 구독 : ${this.topicPrefix}/#`);
             });
         });
 

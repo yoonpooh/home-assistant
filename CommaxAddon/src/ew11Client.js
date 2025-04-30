@@ -1,5 +1,5 @@
 const net = require('net');
-const {getTimestamp} = require('./deviceParser');
+const { log, logError } = require('./utils');
 
 class Ew11Client {
     constructor(host, port, onDataCallback, safeWriteCallback) {
@@ -48,27 +48,27 @@ class Ew11Client {
             this.retryCount = 0;
             this.lastDataTime = Date.now();
             this.startHeartbeat();
-            console.log('EW11에 연결되었습니다.');
+            log('EW11에 연결되었습니다.');
         });
 
         this.socket.on('data', (data) => {
             this.lastDataTime = Date.now(); // Update last data time
             const bytes = data.toString('hex').match(/.{1,2}/g).map(byte => parseInt(byte, 16));
             if (bytes.length > 0 && !this.knownHeaders.includes(bytes[0])) {
-                console.log(`${getTimestamp()} <- ${data.toString('hex').match(/.{1,2}/g).join(' ').toUpperCase()}`);
+                log(`<- ${data.toString('hex').match(/.{1,2}/g).join(' ').toUpperCase()}`);
             }
             this.onDataCallback(bytes);
         });
 
         this.socket.on('error', (err) => {
-            console.error('EW11 connection error:', err);
+            logError('EW11 connection error:', err);
             this.stopHeartbeat();
             this.socket.destroy();
             this.handleReconnect();
         });
 
         this.socket.on('close', () => {
-            console.log('EW11 connection closed');
+            log('EW11 connection closed');
             this.stopHeartbeat();
             this.isConnecting = false;
             this.handleReconnect();
@@ -80,7 +80,7 @@ class Ew11Client {
         this.heartbeatInterval = setInterval(() => {
             const now = Date.now();
             if (now - this.lastDataTime > this.dataTimeout) {
-                console.log('No data received for 5 seconds, triggering reconnect');
+                log('No data received for 5 seconds, triggering reconnect');
                 this.socket.destroy();
             }
         }, 1000); // Check every second
@@ -100,7 +100,7 @@ class Ew11Client {
         }
 
         this.retryCount++;
-        console.log(`Attempting to reconnect (${this.retryCount}/${this.maxRetryAttempts}) in ${this.reconnectDelay}ms...`);
+        log(`Attempting to reconnect (${this.retryCount}/${this.maxRetryAttempts}) in ${this.reconnectDelay}ms...`);
 
         setTimeout(() => {
             if (!this.isConnecting) {

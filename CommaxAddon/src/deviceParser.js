@@ -1,16 +1,6 @@
-// deviceParser.js
-const topicPrefix = process.env.MQTT_TOPIC_PREFIX || 'devcommax';
+const { log, logError } = require('./utils');
 
-function getTimestamp() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0'); // 0부터 시작하므로 +1
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-}
+const topicPrefix = process.env.MQTT_TOPIC_PREFIX || 'devcommax';
 
 function calculateChecksum(bytes) {
     const sum = bytes.reduce((acc, byte) => acc + byte, 0);
@@ -65,7 +55,7 @@ function parseOutletPacket(bytes) {
 function analyzeAndDiscoverOutlet(bytes, discoveredOutlets, mqttClient, saveState) {
     const parsed = parseOutletPacket(bytes);
     if (!parsed || !parsed.valid) {
-        console.log('Invalid outlet packet or checksum:', bytes.map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase());
+        log('체크섬 오류 :', bytes.map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase());
         return;
     }
 
@@ -135,7 +125,7 @@ function analyzeAndDiscoverOutlet(bytes, discoveredOutlets, mqttClient, saveStat
 
         mqttClient.publish(discoveryTopic, JSON.stringify(switchConfig), {retain: true}, async (err) => {
             if (err) {
-                console.error(`Failed to publish switch discovery for ${uniqueId}:`, err);
+                logError(`Failed to publish switch discovery for ${uniqueId}:`, err);
             } else {
                 discoveredOutlets.add(uniqueId);
                 await saveState(state);
@@ -198,7 +188,7 @@ function analyzeAndDiscoverLight(bytes, discoveredLights, mqttClient, saveState)
 
         mqttClient.publish(discoveryTopic, JSON.stringify(discoveryPayload), {retain: true}, async (err) => {
             if (err) {
-                console.error(`Failed to publish light discovery for ${deviceId}:`, err);
+                logError(`Failed to publish light discovery for ${deviceId}:`, err);
             } else {
                 discoveredLights.add(uniqueId);
                 await saveState(discoveredLights);
@@ -212,17 +202,14 @@ function analyzeAndDiscoverLight(bytes, discoveredLights, mqttClient, saveState)
     }
 }
 
-function analyzeParkingAreaAndCarNumber(bytes, parkingState,mqttClient, saveState) {
+function analyzeParkingAreaAndCarNumber(bytes, parkingState, mqttClient, saveState) {
     let parkingArea, carNumber;
 
     if (bytes[0] === 0x2A && bytes.length >= 10) {
-
         // 입차 정보 없음
         if (bytes[4] === 0x80 && bytes[5] === 0x80) {
-
             parkingArea = '-';
             carNumber = '-';
-
         } else {
             const segment1 = bytes.slice(4, 10); // 인덱스 4~9
             const [, byte2_1, , byte4_1, byte5_1, byte6_1] = segment1; // 2, 4, 5, 6번째만 사용
@@ -243,7 +230,6 @@ function analyzeParkingAreaAndCarNumber(bytes, parkingState,mqttClient, saveStat
         const fourth = byte4_2.toString(16).toUpperCase()[1] || '0'; // 두 번째 글자
 
         carNumber = `${first}${second}${third}${fourth}`;
-
     }
 
     // 주차 위치 센서 디스커버리
@@ -262,7 +248,7 @@ function analyzeParkingAreaAndCarNumber(bytes, parkingState,mqttClient, saveStat
 
         mqttClient.publish(parkingDiscoveryTopic, JSON.stringify(parkingConfig), {retain: true}, async (err) => {
             if (err) {
-                console.error('Failed to publish parking area discovery:', err);
+                logError('Failed to publish parking area discovery:', err);
             } else {
                 parkingState.parkingDiscovered = true;
                 await saveState(parkingState);
@@ -286,7 +272,7 @@ function analyzeParkingAreaAndCarNumber(bytes, parkingState,mqttClient, saveStat
 
         mqttClient.publish(carNumberDiscoveryTopic, JSON.stringify(carNumberConfig), {retain: true}, async (err) => {
             if (err) {
-                console.error('Failed to publish car number discovery:', err);
+                logError('Failed to publish car number discovery:', err);
             } else {
                 parkingState.carNumberDiscovered = true;
                 await saveState(parkingState);
@@ -296,11 +282,11 @@ function analyzeParkingAreaAndCarNumber(bytes, parkingState,mqttClient, saveStat
 
     // 상태 퍼블리싱
     if (parkingArea) {
-        console.log(`${getTimestamp()} -> ParkingArea : ${parkingArea}`);
+        log(`주차위치 수신 : ${parkingArea}`);
         mqttClient.publish(`${topicPrefix}/parking/area`, parkingArea, {retain: true});
     }
     if (carNumber) {
-        console.log(`${getTimestamp()} -> CarNumber : ${carNumber}`);
+        log(`차량번호 수신 : ${carNumber}`);
         mqttClient.publish(`${topicPrefix}/parking/car_number`, carNumber, {retain: true});
     }
 }
@@ -314,7 +300,7 @@ function parseTemperaturePacket(bytes) {
     const checksum = bytes[7];
 
     if (calculateChecksum(bytes.slice(0, 7)) !== checksum) {
-        console.log('Invalid temp packet or checksum:', bytes.map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase());
+        log('체크섬 오류 :', bytes.map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase());
         return null;
     }
     return {deviceId: deviceId.toString(16).padStart(2, '0'), state, currentTemp, targetTemp};
@@ -468,20 +454,19 @@ function analyzeAndDiscoverElevator(bytes, discoveredElevators, mqttClient, save
         });
     }
 
-
     // 상태 퍼블리싱 - 내부망 SOAP 통신으로 대체함
     // if (header === 0xA2) {
     //     // ACK: 엘레베이터 호출 시작
-    //     console.log(`Elevator ${elevatorId}: Calling...`);
+    //     log(`Elevator ${elevatorId}: Calling...`);
     //     mqttClient.publish(`${topicPrefix}/elevator/${elevatorId}/status`, "ON", { retain: true });
     // } else if (header === 0x26) {
     //     if (elevatorState === 0x42) {
     //         // 엘레베이터 호출 중 (필요 시 추가 로깅)
-    //         console.log(`Elevator ${elevatorId}: Calling...`);
+    //         log(`Elevator ${elevatorId}: Calling...`);
     //         mqttClient.publish(`${topicPrefix}/elevator/${elevatorId}/status`, "ON", { retain: true });
     //     } else if (elevatorState === 0x00) {
     //         // 호출 완료
-    //         console.log(`Elevator ${elevatorId}: Call completed`);
+    //         log(`Elevator ${elevatorId}: Call completed`);
     //         mqttClient.publish(`${topicPrefix}/elevator/${elevatorId}/status`, "OFF", { retain: true });
     //     }
     // }
@@ -491,7 +476,7 @@ function parseMasterLightPacket(bytes) {
     if (bytes.length !== 8 || ![0xA0, 0xA2].includes(bytes[0])) return null;
 
     // 엘레베이터 패킷과 헤더가 같아서 추가 처리 함
-    if(bytes[4] === 0x28 && bytes[5] === 0xD7)return null;
+    if(bytes[4] === 0x28 && bytes[5] === 0xD7) return null;
 
     const header = bytes[0];
     const deviceId = bytes[2]; // 0x01
@@ -543,7 +528,6 @@ function analyzeAndDiscoverAirQuality(bytes, discoveredSensors, mqttClient, save
     if (bytes[0] !== 0xC8) return;
 
     const deviceId = bytes[1];
-
     const topicPrefix = process.env.MQTT_TOPIC_PREFIX || 'devcommax';
 
     // CO2 값 추출 (4-5자리 결합)
@@ -638,6 +622,5 @@ module.exports = {
     analyzeAndDiscoverElevator,
     analyzeAndDiscoverMasterLight,
     analyzeAndDiscoverAirQuality,
-    calculateChecksum,
-    getTimestamp
+    calculateChecksum
 };

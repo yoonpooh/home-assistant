@@ -1,4 +1,6 @@
 const fs = require('fs').promises;
+const { log, logError } = require('./utils');
+
 const path = '/share/commax_ew11_state.json';
 // const path = './devcommax_state.json'; // 로컬 테스트용
 
@@ -6,7 +8,7 @@ async function loadState() {
     try {
         const data = await fs.readFile(path, 'utf8');
         const state = JSON.parse(data);
-        console.log(`Loaded state from ${path}:`, state);
+        // log(`Loaded state from ${path}:`, state);
         return {
             discoveredOutlets: new Set(state.discoveredOutlets || []),
             discoveredLights: new Set(state.discoveredLights || []),
@@ -22,7 +24,7 @@ async function loadState() {
         };
     } catch (err) {
         if (err.code === 'ENOENT') {
-            console.log(`No ${path} found, starting fresh.`);
+            log(`No ${path} found, starting fresh.`);
             return {
                 discoveredOutlets: new Set(),
                 discoveredLights: new Set(),
@@ -65,7 +67,7 @@ async function saveState(state) {
             }
         };
         await fs.writeFile(path, JSON.stringify(data, null, 2), 'utf8');
-        // console.log(`Saved state to ${path}:`, data);
+        // log(`Saved state to ${path}:`, data);
     } catch (err) {
         console.error(`Error saving ${path}:`, err);
     }

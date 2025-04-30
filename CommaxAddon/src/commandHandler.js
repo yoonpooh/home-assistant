@@ -1,6 +1,6 @@
-// commandHandler.js
+const { log, logError } = require('./utils');
 const PriorityQueue = require('./priorityQueue');
-const { calculateChecksum, getTimestamp } = require('./deviceParser');
+const { calculateChecksum } = require('./deviceParser');
 const topicPrefix = process.env.MQTT_TOPIC_PREFIX || 'devcommax';
 
 class CommandHandler {
@@ -16,7 +16,7 @@ class CommandHandler {
     safeWrite(command, socket) {
         if (!socket.writableNeedDrain) {
             socket.write(command);
-            console.log(`${getTimestamp()} -> ${command.toString('hex').match(/.{1,2}/g).join(' ').toUpperCase()}`);
+            log(`-> ${command.toString('hex').match(/.{1,2}/g).join(' ').toUpperCase()}`);
         } else {
             this.pq.enqueue(command, 1);
         }
@@ -47,13 +47,13 @@ class CommandHandler {
         if (!this.commandMetadata.has(hexKey)) return; // 이미 삭제된 경우 무시
 
         if (commandEntry.retries >= this.MAX_RETRIES) {
-            console.error(`${getTimestamp()} Command failed after ${this.MAX_RETRIES} retries: ${hexKey}`);
+            logError(`${hexKey.match(/.{1,2}/g).join(' ').toUpperCase()} 명령 재전송 실패 한도 도달 (${this.MAX_RETRIES})`);
             this.commandMetadata.delete(hexKey);
             return;
         }
 
         commandEntry.retries += 1;
-        console.log(`${getTimestamp()} -> ${hexKey.match(/.{1,2}/g).join(' ')} Retrying command (${commandEntry.retries}/${this.MAX_RETRIES})`);
+        log(`-> ${hexKey.match(/.{1,2}/g).join(' ').toUpperCase()} 명령 재전송 (${commandEntry.retries}/${this.MAX_RETRIES})`);
         this.pq.enqueue(commandEntry.command, commandEntry.priority); // 큐에 다시 추가
         this.startRetryTimer(commandEntry);
     }
@@ -124,7 +124,7 @@ class CommandHandler {
         // 해당 디바이스와 관련된 명령 찾기
         for (const [hexKey, entry] of this.commandMetadata.entries()) {
             if (entry.deviceType === deviceType && entry.deviceId === deviceId) {
-                console.log(`${getTimestamp()} <- ${bytes.map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase()} ACK/State received for command ${hexKey.match(/.{1,2}/g).join(' ').toUpperCase()}`);
+                log(`<- ${bytes.map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase()} ACK/STATE 수신 완료. 명령 성공 ${hexKey.match(/.{1,2}/g).join(' ').toUpperCase()}`);
                 this.removeCommand(Buffer.from(hexKey, 'hex'));
                 break;
             }
@@ -344,12 +344,12 @@ class CommandHandler {
                 break;
 
             case 'elevator':
-                // console.log(packet);
-                // console.log(packetRaw);
+                // log(packet);
+                // log(packetRaw);
                 // if (packet.at(-1) === 'call') {
                 //     const command = this.createElevatorCallCommand(deviceId2);
                 //     this.sendCommand(command);
-                //     console.log(`Elevator ${deviceId2}: Call command sent`);
+                //     log(`Elevator ${deviceId2}: Call command sent`);
                 // }
             break;
 
