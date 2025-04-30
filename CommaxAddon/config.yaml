@@ -1,6 +1,6 @@
 name: "Commax Wallpad"
 description: "코맥스 애드온 TCP Socket Ver"
-version: "1.0.1"
+version: "1.0.2"
 slug: "commax_wallpad"
 init: false
 arch:
