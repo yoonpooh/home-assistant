@@ -2,18 +2,22 @@ const net = require('net');
 const { log, logError } = require('./utils');
 
 class Ew11Client {
-    constructor(host, port, onDataCallback, safeWriteCallback) {
+    constructor(host, port, onDataCallback, safeWriteCallback, state, mqttClient, setControlDevicesAvailable, setControlDevicesUnavailable) {
         this.host = host;
         this.port = port;
         this.onDataCallback = onDataCallback;
         this.safeWriteCallback = safeWriteCallback;
+        this.state = state;
+        this.mqttClient = mqttClient;
+        this.setControlDevicesAvailable = setControlDevicesAvailable;
+        this.setControlDevicesUnavailable = setControlDevicesUnavailable;
         this.knownHeaders = [
-            0x78, 0xF8, 0x76, 0xF6,// FAN
-            0x31, 0xB1, 0x30, 0xB0,// LIGHT
-            0x22, 0xA2, 0x20, 0xA0,// MASTER LIGHT
-            0x7A, 0xFA, 0x79, 0xF9,// OUTLET
-            0x04, 0x84, 0x02, 0x82,// TEMP
-            0x11, 0x91, 0x10, 0x90,// 가스차단기
+            0x78, 0xF8, 0x76, 0xF6, // FAN
+            0x31, 0xB1, 0x30, 0xB0, // LIGHT
+            0x22, 0xA2, 0x20, 0xA0, // MASTER LIGHT
+            0x7A, 0xFA, 0x79, 0xF9, // OUTLET
+            0x04, 0x84, 0x02, 0x82, // TEMP
+            0x11, 0x91, 0x10, 0x90, // 가스차단기
             0x7F, // 생활정보기 날짜 시간 응답
             0x24, 0xA4, 0x25, // 주차위치 REQ
             0x2A, 0x80, 0xAA, // 주차위치 STAT
@@ -30,6 +34,7 @@ class Ew11Client {
         this.lastDataTime = Date.now();
         this.dataTimeout = 5000; // 5 seconds with no data
         this.heartbeatInterval = null;
+        this.isAvailable = false; // Track availability state to prevent duplicate calls
         this.connect();
     }
 
@@ -38,7 +43,7 @@ class Ew11Client {
         this.isConnecting = true;
 
         const timeout = setTimeout(() => {
-            console.error('EW11 connection timeout');
+            logError('EW11 connection timeout');
             this.socket.destroy();
         }, this.connectionTimeout);
 
@@ -75,7 +80,7 @@ class Ew11Client {
         });
     }
 
-    startHeartbeat() {
+    async startHeartbeat() {
         if (this.heartbeatInterval) return;
         this.heartbeatInterval = setInterval(() => {
             const now = Date.now();
@@ -84,18 +89,32 @@ class Ew11Client {
                 this.socket.destroy();
             }
         }, 1000); // Check every second
+
+        // Set devices to available only if not already available
+        if (!this.isAvailable && this.state && this.mqttClient && this.setControlDevicesAvailable) {
+            await this.setControlDevicesAvailable(this.state, this.mqttClient);
+            this.isAvailable = true;
+            log('Devices and sensors set to available due to heartbeat start');
+        }
     }
 
-    stopHeartbeat() {
+    async stopHeartbeat() {
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval);
             this.heartbeatInterval = null;
+
+            // Set devices to unavailable only if currently available
+            if (this.isAvailable && this.state && this.mqttClient && this.setControlDevicesUnavailable) {
+                await this.setControlDevicesUnavailable(this.state, this.mqttClient);
+                this.isAvailable = false;
+                log('Devices and sensors set to unavailable due to heartbeat stop');
+            }
         }
     }
 
     handleReconnect() {
         if (this.retryCount >= this.maxRetryAttempts) {
-            console.error('Max retry attempts reached. Stopping reconnection.');
+            logError('Max retry attempts reached. Stopping reconnection.');
             return;
         }
 
@@ -113,7 +132,7 @@ class Ew11Client {
         if (this.socket && !this.socket.destroyed) {
             this.safeWriteCallback(command);
         } else {
-            console.warn('Socket is not connected. Command not sent.');
+            log('Socket is not connected. Command not sent.');
         }
     }
 

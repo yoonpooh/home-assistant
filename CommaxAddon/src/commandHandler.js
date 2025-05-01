@@ -140,16 +140,16 @@ class CommandHandler {
     }
 
     createOutletCommand(deviceId, commandType, value, power = 0) {
-        const powerHigh = (power >> 8) & 0xFF;
-        const powerLow = power & 0xFF;
+        // const powerHigh = (power >> 8) & 0xFF;
+        // const powerLow = power & 0xFF;
 
         const bytes = [
             0x7A,
             parseInt(deviceId, 16),
             commandType,
             value,
-            powerHigh,
-            powerLow,
+            power,
+            0x00,
             0x00
         ];
         bytes.push(calculateChecksum(bytes));
