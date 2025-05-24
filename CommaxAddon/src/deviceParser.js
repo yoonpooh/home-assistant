@@ -223,33 +223,26 @@ function analyzeAndDiscoverLight(bytes, discoveredLights, mqttClient, saveState)
 }
 
 function analyzeParkingAreaAndCarNumber(bytes, parkingState, mqttClient, saveState) {
-    let parkingArea, carNumber;
+    let parkingArea = '-';
+    let carNumber = '-';
 
-    if (bytes[0] === 0x2A && bytes.length >= 10) {
-        // 입차 정보 없음
+    if (bytes[0] === 0x2A && bytes.length >= 42) {
         if (bytes[4] === 0x80 && bytes[5] === 0x80) {
-            parkingArea = '-';
-            carNumber = '-';
+            return { parkingArea, carNumber };
         } else {
-            const segment1 = bytes.slice(4, 10); // 인덱스 4~9
-            const [, byte2_1, , byte4_1, byte5_1, byte6_1] = segment1; // 2, 4, 5, 6번째만 사용
-            const prefix1 = byte2_1.toString(16).toUpperCase();       // 2번째 바이트
-            const z1 = byte4_1.toString(16).toUpperCase()[0];         // 4번째 바이트 첫 글자
-            const w1 = byte5_1.toString(16).toUpperCase()[1] || '0';  // 5번째 바이트 두 번째 글자 (없으면 0)
-            const v1 = byte6_1.toString(16).toUpperCase()[1] || '0';  // 6번째 바이트 두 번째 글자 (없으면 0)
-            parkingArea = `${prefix1}-${z1}${w1}${v1}`;
+            // 바이트를 대문자 A~Z로 매핑하는 함수
+            const toLetter = (byte) => byte >= 0xA0 && byte <= 0xDA
+                ? String.fromCharCode(65 + (byte - 0xC1))
+                : '';
+
+            // 인덱스 4~10: parkingArea (7바이트 -> 문자열)
+            const segment1 = bytes.slice(4, 11);
+            parkingArea = segment1.map(toLetter).join('');
+
+            // 인덱스 38~41: carNumber (4바이트 -> 문자열)
+            const segment2 = bytes.slice(38, 42);
+            carNumber = segment2.map(toLetter).join('');
         }
-    }
-
-    if (bytes[0] === 0x80 && bytes[1] !== 0x80 && bytes.length >= 10) {
-        const segment2 = bytes.slice(6, 10); // 인덱스 6~9
-        const [byte1_2, byte2_2, byte3_2, byte4_2] = segment2;
-        const first = byte1_2.toString(16).toUpperCase()[1] || '0';  // 두 번째 글자 (없으면 0)
-        const second = byte2_2.toString(16).toUpperCase()[1] || '0'; // 두 번째 글자
-        const third = byte3_2.toString(16).toUpperCase()[1] || '0';  // 두 번째 글자
-        const fourth = byte4_2.toString(16).toUpperCase()[1] || '0'; // 두 번째 글자
-
-        carNumber = `${first}${second}${third}${fourth}`;
     }
 
     if (parkingArea && !parkingState.parkingDiscovered) {
