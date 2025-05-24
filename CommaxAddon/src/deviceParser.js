@@ -223,26 +223,27 @@ function analyzeAndDiscoverLight(bytes, discoveredLights, mqttClient, saveState)
 }
 
 function analyzeParkingAreaAndCarNumber(bytes, parkingState, mqttClient, saveState) {
-    let parkingArea = '-';
-    let carNumber = '-';
+    let parkingArea, carNumber;
 
-    if (bytes[0] === 0x2A && bytes.length >= 42) {
+    const toLetter = (byte) => byte >= 0xA0 && byte <= 0xDA
+        ? String.fromCharCode(65 + (byte - 0xC1))
+        : '';
+
+    if (bytes[0] === 0x2A && bytes.length >= 10) {
+        // 입차 정보 없음
         if (bytes[4] === 0x80 && bytes[5] === 0x80) {
-            return { parkingArea, carNumber };
+            parkingArea = '-';
+            carNumber = '-';
         } else {
-            // 바이트를 대문자 A~Z로 매핑하는 함수
-            const toLetter = (byte) => byte >= 0xA0 && byte <= 0xDA
-                ? String.fromCharCode(65 + (byte - 0xC1))
-                : '';
-
             // 인덱스 4~10: parkingArea (7바이트 -> 문자열)
             const segment1 = bytes.slice(4, 11);
             parkingArea = segment1.map(toLetter).join('');
-
-            // 인덱스 38~41: carNumber (4바이트 -> 문자열)
-            const segment2 = bytes.slice(38, 42);
-            carNumber = segment2.map(toLetter).join('');
         }
+    }
+
+    if (bytes[0] === 0x80 && bytes[1] !== 0x80 && bytes.length >= 10) {
+        const segment2 = bytes.slice(6, 10); // 인덱스 6~9
+        carNumber = segment2.map(toLetter).join('');
     }
 
     if (parkingArea && !parkingState.parkingDiscovered) {
