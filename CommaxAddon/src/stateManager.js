@@ -17,6 +17,7 @@ async function loadState() {
             discoveredMasterLights: new Set(state.discoveredMasterLights || []),
             discoveredElevators: new Set(state.discoveredElevators || []),
             discoveredSensors: new Set(state.discoveredSensors || []),
+            discoveredMeters: new Set(state.discoveredMeters || []),
             parkingState: {
                 parkingDiscovered: state.parkingState?.parkingDiscovered || false,
                 carNumberDiscovered: state.parkingState?.carNumberDiscovered || false
@@ -33,6 +34,7 @@ async function loadState() {
                 discoveredElevators: new Set(),
                 discoveredMasterLights: new Set(),
                 discoveredSensors: new Set(),
+                discoveredMeters: new Set(),
                 parkingState: { parkingDiscovered: false, carNumberDiscovered: false }
             };
         } else {
@@ -45,6 +47,7 @@ async function loadState() {
                 discoveredElevators: new Set(),
                 discoveredMasterLights: new Set(),
                 discoveredSensors: new Set(),
+                discoveredMeters: new Set(),
                 parkingState: { parkingDiscovered: false, carNumberDiscovered: false }
             };
         }
@@ -61,6 +64,7 @@ async function saveState(state) {
             discoveredElevators: Array.from(state.discoveredElevators),
             discoveredMasterLights: Array.from(state.discoveredMasterLights),
             discoveredSensors: Array.from(state.discoveredSensors),
+            discoveredMeters: Array.from(state.discoveredMeters),
             parkingState: {
                 parkingDiscovered: state.parkingState.parkingDiscovered,
                 carNumberDiscovered: state.parkingState.carNumberDiscovered

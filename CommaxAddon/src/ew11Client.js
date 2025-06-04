@@ -23,16 +23,17 @@ class Ew11Client {
             0x2A, 0x80, 0xAA, // 주차위치 STAT
             0x47, 0x48, // 공기질 센서 REQ
             0xC8, // 공기질 센서 STAT
-            0xF7, 0x77, // ?
+            0xF7, 0x77, // 원격검침?
+            0x26, // EV 호출중
             0x0F, 0x8F, // ?
         ];
-        this.reconnectDelay = 5000; // 5 seconds
+        this.reconnectDelay = 30000; // 30 seconds
         this.maxRetryAttempts = 10;
         this.retryCount = 0;
-        this.connectionTimeout = 10000; // 10 seconds
+        this.connectionTimeout = 30000; // 30 seconds
         this.isConnecting = false;
         this.lastDataTime = Date.now();
-        this.dataTimeout = 5000; // 5 seconds with no data
+        this.dataTimeout = 20000; // 20 seconds with no data
         this.heartbeatInterval = null;
         this.isAvailable = false; // Track availability state to prevent duplicate calls
         this.connect();
@@ -53,7 +54,7 @@ class Ew11Client {
             this.retryCount = 0;
             this.lastDataTime = Date.now();
             this.startHeartbeat();
-            log('EW11에 연결되었습니다.');
+            log(`${this.host} EW11에 연결되었습니다.`);
         });
 
         this.socket.on('data', (data) => {
@@ -85,7 +86,7 @@ class Ew11Client {
         this.heartbeatInterval = setInterval(() => {
             const now = Date.now();
             if (now - this.lastDataTime > this.dataTimeout) {
-                log('No data received for 5 seconds, triggering reconnect');
+                log(`No data received for ${this.dataTimeout} seconds, triggering reconnect`);
                 this.socket.destroy();
             }
         }, 1000); // Check every second

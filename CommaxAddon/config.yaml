@@ -1,6 +1,6 @@
 name: "Commax Wallpad"
 description: "코맥스 애드온 TCP Socket Ver"
-version: "1.0.5"
+version: "1.0.6"
 slug: "commax_wallpad"
 init: false
 arch:
@@ -17,6 +17,8 @@ options:
   mqtt_password: "password"
   ew11_host: "192.168.0.37"
   ew11_port: 8899
+  ew11_metering_host: ""
+  ew11_metering_port: 8899
 schema:
   mqtt_topic_prefix: "str"
   mqtt_broker_url: "str"
@@ -25,5 +27,7 @@ schema:
   mqtt_password: "password"
   ew11_host: "str"
   ew11_port: "int"
+  ew11_metering_host: "str?"
+  ew11_metering_port: "int?"
 map:
   - "share:rw"

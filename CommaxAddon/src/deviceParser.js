@@ -650,6 +650,154 @@ function analyzeAndDiscoverAirQuality(bytes, discoveredSensors, mqttClient, save
     }
 }
 
+function analyzeAndDiscoverMetering(bytes,discoveredMeters,mqttClient,saveState) {
+    if(bytes[0] === 0xF7 && bytes[1] === 0x30 &&  bytes.length === 32) {
+
+        // log(`<- ${bytes.map(byte => byte.toString(16).padStart(2, '0')).join(' ').toUpperCase()}`);
+
+        const water = parseInt(bytes[5].toString(16).padStart(2, '0') + bytes[6].toString(16).padStart(2, '0'),10);
+        const accWater = parseInt(bytes[8].toString(16).padStart(2, '0') + bytes[9].toString(16).padStart(2, '0'),10) / 10;
+
+        const warm = parseInt(bytes[20].toString(16).padStart(2, '0') + bytes[21].toString(16).padStart(2, '0'),10);
+        const accWarm = parseInt(bytes[23].toString(16).padStart(2, '0') + bytes[24].toString(16).padStart(2, '0'),10) / 10;
+
+        const electric = parseInt(bytes[15].toString(16).padStart(2, '0') + bytes[16].toString(16).padStart(2, '0'),10);
+        const accElectric = parseInt(bytes[17].toString(16).padStart(2, '0') + bytes[18].toString(16).padStart(2, '0')+ bytes[19].toString(16).padStart(2, '0'),10) / 10;
+
+        const heat = parseInt(bytes[25].toString(16).padStart(2, '0') + bytes[26].toString(16).padStart(2, '0'),10) / 10;
+        const accHeat = parseInt(bytes[28].toString(16).padStart(2, '0') + bytes[29].toString(16).padStart(2, '0'),10) / 100;
+
+        // log(`실시간 전력 : ${electric} / 실시간 수도 : ${water} / 실시간 온수 : ${warm} / 실시간 난방 : ${heat}`);
+        // log(`누적 전력 : ${accElectric} / 누적 수도 : ${accWater} / 누적 온수 : ${accWarm} / 누적 난방 : ${accHeat}`);
+
+        // 센서 ID 설정
+        const uniqueId = 'commax_metering';
+        const sensors = [
+            {
+                id: 'water_meter',
+                name: '실시간 수도 사용량',
+                unique_id: 'commax_water_meter',
+                state_topic: `${topicPrefix}/smart_metering/water_meter/state`,
+                availability_topic: `${topicPrefix}/smart_metering/water_meter/availability`,
+                unit_of_measurement: 'm³/h',
+                device_class: 'water',
+                precision: 1,
+            },
+            {
+                id: 'electric_meter',
+                name: '실시간 전기 사용량',
+                unique_id: 'commax_electric_meter',
+                state_topic: `${topicPrefix}/smart_metering/electric_meter/state`,
+                availability_topic: `${topicPrefix}/smart_metering/electric_meter/availability`,
+                unit_of_measurement: 'W',
+                device_class: 'power',
+                precision: 1,
+            },
+            {
+                id: 'warm_meter',
+                name: '실시간 온수 사용량',
+                unique_id: 'commax_warm_meter',
+                state_topic: `${topicPrefix}/smart_metering/warm_meter/state`,
+                availability_topic: `${topicPrefix}/smart_metering/warm_meter/availability`,
+                unit_of_measurement: 'm³/h',
+                device_class: 'water',
+                precision: 1,
+            },
+            {
+                id: 'heat_meter',
+                name: '실시간 난방 사용량',
+                unique_id: 'commax_heat_meter',
+                state_topic: `${topicPrefix}/smart_metering/heat_meter/state`,
+                availability_topic: `${topicPrefix}/smart_metering/heat_meter/availability`,
+                unit_of_measurement: 'kW',
+                device_class: 'power',
+                precision: 1,
+            },
+            {
+                id: 'water_acc_meter',
+                name: '누적 수도 사용량',
+                unique_id: 'commax_water_acc_meter',
+                state_topic: `${topicPrefix}/smart_metering/water_acc_meter/state`,
+                availability_topic: `${topicPrefix}/smart_metering/water_acc_meter/availability`,
+                unit_of_measurement: 'm³/h',
+                device_class: 'water',
+                precision: 1,
+            },
+            {
+                id: 'electric_acc_meter',
+                name: '누적 전기 사용량',
+                unique_id: 'commax_electric_acc_meter',
+                state_topic: `${topicPrefix}/smart_metering/electric_acc_meter/state`,
+                availability_topic: `${topicPrefix}/smart_metering/electric_acc_meter/availability`,
+                unit_of_measurement: 'kWh',
+                device_class: 'power',
+                precision: 1,
+            },
+            {
+                id: 'warm_acc_meter',
+                name: '누적 온수 사용량',
+                unique_id: 'commax_warm_acc_meter',
+                state_topic: `${topicPrefix}/smart_metering/warm_acc_meter/state`,
+                availability_topic: `${topicPrefix}/smart_metering/warm_acc_meter/availability`,
+                unit_of_measurement: 'm³',
+                device_class: 'water',
+                precision: 1,
+            },
+            {
+                id: 'heat_acc_meter',
+                name: '누적 난방 사용량',
+                unique_id: 'commax_heat_acc_meter',
+                state_topic: `${topicPrefix}/smart_metering/heat_acc_meter/state`,
+                availability_topic: `${topicPrefix}/smart_metering/heat_acc_meter/availability`,
+                unit_of_measurement: 'm³',
+                device_class: 'power',
+                precision: 1,
+            },
+        ];
+
+        if (!discoveredMeters.has(uniqueId)) {
+            sensors.forEach(sensor => {
+                const sensorConfig = {
+                    name: sensor.name,
+                    unique_id: sensor.unique_id,
+                    state_topic: sensor.state_topic,
+                    availability_topic: sensor.availability_topic,
+                    payload_available: 'available',
+                    payload_not_available: 'unavailable',
+                    unit_of_measurement: sensor.unit_of_measurement,
+                    device_class: sensor.device_class,
+                    device: {
+                        identifiers: ["Commax"],
+                        name: "월패드",
+                        manufacturer: "Commax"
+                    }
+                };
+                mqttClient.publish(
+                  `homeassistant/sensor/${sensor.unique_id}/config`,
+                  JSON.stringify(sensorConfig),
+                  { retain: true },
+                  (err) => {
+                      if (!err) {
+                          discoveredMeters.add(uniqueId);
+                          saveState(discoveredMeters);
+                          mqttClient.publish(sensor.availability_topic, 'available', { retain: true, qos: 1 });
+                      }
+                  }
+                );
+            });
+        }
+
+        mqttClient.publish(`${topicPrefix}/smart_metering/water_meter/state`, water.toString(), { retain: true });
+        mqttClient.publish(`${topicPrefix}/smart_metering/water_acc_meter/state`, accWater.toString(), { retain: true });
+        mqttClient.publish(`${topicPrefix}/smart_metering/electric_meter/state`, electric.toString(), { retain: true });
+        mqttClient.publish(`${topicPrefix}/smart_metering/electric_acc_meter/state`, accElectric.toString(), { retain: true });
+        mqttClient.publish(`${topicPrefix}/smart_metering/warm_meter/state`, warm.toString(), { retain: true });
+        mqttClient.publish(`${topicPrefix}/smart_metering/warm_acc_meter/state`, accWarm.toString(), { retain: true });
+        mqttClient.publish(`${topicPrefix}/smart_metering/heat_meter/state`, heat.toString(), { retain: true });
+        mqttClient.publish(`${topicPrefix}/smart_metering/heat_acc_meter/state`, accHeat.toString(), { retain: true });
+    }
+}
+
 module.exports = {
     analyzeAndDiscoverOutlet,
     analyzeAndDiscoverLight,
@@ -659,5 +807,6 @@ module.exports = {
     analyzeAndDiscoverElevator,
     analyzeAndDiscoverMasterLight,
     analyzeAndDiscoverAirQuality,
+    analyzeAndDiscoverMetering,
     calculateChecksum
 };
