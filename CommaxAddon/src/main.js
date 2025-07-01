@@ -111,7 +111,7 @@ const ew11Client = new Ew11Client(HOST, PORT, (bytes) => {
             commandHandler.handleAckOrState(bytes);
         }
 
-        if (bytes[0] === 0xB0 || bytes[0] === 0xB1) {
+        if (bytes[0] === 0xB0 || bytes[0] === 0xB1 || bytes[0] === 0xDE) {
             analyzeAndDiscoverLight(bytes, state.discoveredLights, mqttClient, () => saveState(state));
             commandHandler.handleAckOrState(bytes);
         }
