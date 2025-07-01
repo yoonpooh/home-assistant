@@ -71,7 +71,7 @@ class CommandHandler {
         const header = command[0];
         switch (header) {
             case 0x7A: return 'outlet';
-            case 0x31: return 'light';
+            case 0x1F: return 'light';
             case 0x04: return 'temp';
             case 0x78: return 'fan';
             case 0xA0: return 'elevator';
@@ -91,7 +91,7 @@ class CommandHandler {
                 deviceId = bytes[2].toString(16).padStart(2, '0');
             break;
 
-            case 0xB1: case 0xB0:
+            case 0xB1: case 0xB0: case 0x1E:
                 deviceType = 'light';
                 deviceId = bytes[2].toString(16).padStart(2, '0');
             break;
@@ -157,7 +157,7 @@ class CommandHandler {
     }
 
     createLightPacket(deviceId, power, brightness) {
-        const header = 0x31;
+        const header = 0x1F;
         const deviceIdByte = parseInt(deviceId, 16);
 
         const bytes = [

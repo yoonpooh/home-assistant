@@ -166,7 +166,7 @@ function analyzeAndDiscoverOutlet(bytes, discoveredOutlets, mqttClient, saveStat
 }
 
 function analyzeAndDiscoverLight(bytes, discoveredLights, mqttClient, saveState) {
-    if (bytes.length !== 8 || ![0xB0, 0xB1, 0xDE].includes(bytes[0])) return null;
+    if (bytes.length !== 8 || ![0xB0, 0xB1, 0x1E].includes(bytes[0])) return null;
 
     const deviceId = bytes[2].toString(16).padStart(2, '0');
     const power = bytes[1];
