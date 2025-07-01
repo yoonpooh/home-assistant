@@ -102,9 +102,6 @@ const ew11Client = new Ew11Client(HOST, PORT, (bytes) => {
             intervals = []; // 메모리 절약을 위해 배열 초기화
             windowStartTime = null; // 더 이상 사용하지 않음
         }
-
-        log("bytes[0]:", bytes[0]);
-        log('bytes:', bytes);
         // 기존 데이터 처리 로직
         if (bytes[0] === 0xF9 || bytes[0] === 0xFA) {
             analyzeAndDiscoverOutlet(bytes, state.discoveredOutlets, mqttClient, () => saveState(state));
